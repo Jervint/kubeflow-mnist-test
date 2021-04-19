@@ -2,9 +2,9 @@
 '''
 Date: 2021-04-14 16:16:26
 LastEditors: Jervint
-LastEditTime: 2021-04-14 17:45:37
+LastEditTime: 2021-04-16 17:18:12
 Description: 
-FilePath: /kubeflow-pytorch-test/train.py
+FilePath: /kubeflow-pytorch-test/devolopment/train.py
 '''
 
 import argparse
@@ -64,6 +64,8 @@ def train(train_loader_path,
           lr=1e-2,
           momentum=0.5,
           seed=1):
+    import os
+    os.system("nvidia-smi")
     writer = SummaryWriter("./logs/{}_{}".format(epochs, lr))
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -72,8 +74,10 @@ def train(train_loader_path,
         train_dataloader = pickle.loads(f.read())
     with open(test_loader_path, 'rb') as f:
         test_dataloader = pickle.loads(f.read())
-
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
     model = Net().to(device)
+
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
     for epoch in range(1, epochs + 1):
@@ -81,6 +85,9 @@ def train(train_loader_path,
         test_epoch(model, test_dataloader, epoch, device, writer)
 
     torch.save(model.cpu().state_dict(), "mnist.pt")
+    with open('output.txt', 'w') as f:
+        f.write(model_path)
+        print(f'Model written to: {model_path}')
 
 
 if __name__ == "__main__":
@@ -108,7 +115,8 @@ if __name__ == "__main__":
                         default=20,
                         type=int)
     args = parser.parse_args()
-
+    # from preprocess import preprocess
+    # preprocess(args.dataset_root_dir, 64, 64, 4, args.dataset_name)
     train_loader_path = os.path.join(args.dataset_root_dir, args.dataset_name,
                                      "train.pickle")
     test_loader_path = os.path.join(args.dataset_root_dir, args.dataset_name,
